@@ -1,0 +1,1072 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lab Maya IPA TK - Belajar Anggota Tubuh</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brandYellow: '#FFDE59',
+                        brandOrange: '#FF914D',
+                        brandBlue: '#00C2CB',
+                        brandPink: '#FF66C4',
+                        brandGreen: '#7ED957',
+                        brandPurple: '#8C52FF'
+                    },
+                    fontFamily: {
+                        fredoka: ['Fredoka', 'sans-serif'],
+                        quicksand: ['Quicksand', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Canvas Confetti CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <!-- MediaPipe Pose & Camera Utils CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+
+    <style>
+        body {
+            font-family: 'Quicksand', sans-serif;
+            background: linear-gradient(135deg, #e0f7fa 0%, #fff9c4 100%);
+            touch-action: manipulation;
+        }
+
+        .heading-font {
+            font-family: 'Fredoka', cursive;
+        }
+
+        /* Glassmorphism Card Effect */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.92);
+            backdrop-filter: blur(10px);
+            border: 4px solid #ffffff;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Mirrored Video & Canvas Container */
+        .mirror-container {
+            transform: scaleX(-1);
+        }
+
+        /* Hold Progress Ring */
+        .hold-progress-ring circle {
+            transition: stroke-dashoffset 0.1s linear;
+        }
+    </style>
+</head>
+<body class="min-h-screen pb-10 text-slate-800">
+
+    <!-- HEADER DAN NAVIGASI UTAMA -->
+    <header class="bg-gradient-to-r from-brandOrange via-brandPink to-brandPurple text-white p-4 shadow-lg sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <div class="bg-white text-brandOrange p-3 rounded-2xl shadow-md text-2xl heading-font flex items-center justify-center">
+                    <i class="fa-solid fa-child-reaching text-3xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-2xl md:text-3xl heading-font tracking-wide font-bold drop-shadow">LAB MAYA IPA TK</h1>
+                    <p class="text-xs md:text-sm font-semibold opacity-90">Belajar Anggota Tubuh Interaktif dengan Gerakan!</p>
+                </div>
+            </div>
+
+            <!-- TAB NAVIGASI -->
+            <nav class="flex bg-white/20 p-1.5 rounded-2xl backdrop-blur-md gap-1 w-full md:w-auto justify-center">
+                <button id="tab-detektor-btn" onclick="switchTab('detektor')" class="tab-btn px-4 py-2 rounded-xl text-sm md:text-base heading-font font-bold transition-all bg-white text-brandPurple shadow">
+                    <i class="fa-solid fa-camera mr-1"></i> Detektor Gerak
+                </button>
+                <button id="tab-materi-btn" onclick="switchTab('materi')" class="tab-btn px-4 py-2 rounded-xl text-sm md:text-base heading-font font-bold transition-all text-white hover:bg-white/10">
+                    <i class="fa-solid fa-book-open mr-1"></i> Materi Belajar
+                </button>
+                <button id="tab-kuis-btn" onclick="switchTab('kuis')" class="tab-btn px-4 py-2 rounded-xl text-sm md:text-base heading-font font-bold transition-all text-white hover:bg-white/10">
+                    <i class="fa-solid fa-gamepad mr-1"></i> Kuis Gerak
+                </button>
+            </nav>
+
+            <!-- SOUND TOGGLE -->
+            <button id="sound-toggle-btn" onclick="toggleAudio()" class="bg-white/20 hover:bg-white/30 text-white p-2.5 rounded-xl transition text-lg flex items-center gap-2">
+                <i id="sound-icon" class="fa-solid fa-volume-high"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN CONTAINER -->
+    <main class="max-w-7xl mx-auto p-4 md:p-6">
+
+        <!-- ================= TAB 1: DETEKTOR GERAK ================= -->
+        <section id="tab-detektor" class="tab-content grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            <!-- VIDEO CANVASES (Kiri/Utama) -->
+            <div class="lg:col-span-8 flex flex-col gap-4">
+                <div class="glass-card rounded-3xl p-4 flex flex-col items-center relative overflow-hidden">
+                    <div class="w-full flex justify-between items-center mb-3">
+                        <span class="heading-font text-lg md:text-xl text-brandPurple font-bold flex items-center gap-2">
+                            <i class="fa-solid fa-display text-brandPink"></i> Cermin Ajaib Gerak
+                        </span>
+                        <span id="camera-status-badge" class="px-3 py-1 bg-red-100 text-red-600 font-bold rounded-full text-xs flex items-center gap-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"></span> Kamera Mati
+                        </span>
+                    </div>
+
+                    <!-- Video Container -->
+                    <div class="relative w-full aspect-video bg-slate-900 rounded-2xl overflow-hidden shadow-inner border-4 border-amber-200 flex items-center justify-center">
+                        <video id="webcam" class="hidden" playsinline></video>
+                        <div class="mirror-container absolute inset-0 w-full h-full">
+                            <canvas id="output-canvas" class="w-full h-full object-cover"></canvas>
+                        </div>
+
+                        <!-- Overlay Placeholder jika Kamera Belum Aktif -->
+                        <div id="camera-placeholder" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-800/90 text-white p-6 text-center z-10">
+                            <div class="w-20 h-20 rounded-full bg-brandYellow/20 flex items-center justify-center text-brandYellow text-4xl mb-4 animate-bounce">
+                                <i class="fa-solid fa-video"></i>
+                            </div>
+                            <h3 class="heading-font text-2xl font-bold mb-2">Yuk, Buka Kameramu!</h3>
+                            <p class="text-slate-300 text-sm max-w-md mb-6">Aktifkan kamera laptop/komputer untuk mulai mendeteksi gerakan tangan, kaki, dan kepala secara langsung!</p>
+                            <button onclick="startCamera()" class="bg-brandGreen hover:bg-emerald-500 text-white heading-font text-lg px-8 py-3 rounded-2xl shadow-lg transition transform hover:scale-105 font-bold flex items-center gap-2">
+                                <i class="fa-solid fa-power-off"></i> Buka Kamera Sekarang
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- KONTROL UTAMA -->
+                    <div class="flex flex-wrap gap-3 mt-4 w-full justify-center">
+                        <button id="toggle-cam-btn" onclick="toggleCamera()" class="bg-brandGreen hover:bg-emerald-600 text-white heading-font px-6 py-2.5 rounded-xl shadow transition font-bold flex items-center gap-2">
+                            <i class="fa-solid fa-video"></i> <span id="toggle-cam-text">Buka Kamera</span>
+                        </button>
+                        <button onclick="resetDetection()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 heading-font px-6 py-2.5 rounded-xl shadow transition font-bold flex items-center gap-2">
+                            <i class="fa-solid fa-rotate-right"></i> Reset/Mulai Ulang
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PANEL INFORMASI & MISI SISWA (Kanan) -->
+            <div class="lg:col-span-4 flex flex-col gap-4">
+                <!-- Banner Status Gerakan -->
+                <div class="glass-card rounded-3xl p-5 border-l-8 border-brandYellow">
+                    <h3 class="heading-font text-slate-500 text-xs tracking-wider uppercase font-bold mb-1">Status Gerakan Terdeteksi:</h3>
+                    <div id="motion-status" class="heading-font text-2xl text-brandPurple font-bold min-h-[60px] flex items-center gap-3">
+                        <i class="fa-solid fa-wand-magic-sparkles text-brandYellow text-3xl"></i>
+                        <span>Diam / Bersiap</span>
+                    </div>
+                </div>
+
+                <!-- Misi Gerak Siswa -->
+                <div class="glass-card rounded-3xl p-5 flex-1 flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center gap-2 mb-3">
+                            <i class="fa-solid fa-bullseye text-brandPink text-2xl"></i>
+                            <h3 class="heading-font text-xl font-bold text-slate-800">Misi Anak Pintar!</h3>
+                        </div>
+                        <p class="text-xs text-slate-600 mb-4">Cobalah gerakan tubuh berikut di depan kamera dan lihat garis rangkamu menebal!</p>
+                        
+                        <ul class="space-y-2.5 text-sm font-semibold">
+                            <li class="p-2.5 bg-blue-50 rounded-xl flex items-center gap-3 border border-blue-100">
+                                <span class="w-8 h-8 rounded-lg bg-blue-500 text-white flex items-center justify-center font-bold text-xs">1</span>
+                                <span>Angkat & gerakkan <b>Tangan Kanan</b></span>
+                            </li>
+                            <li class="p-2.5 bg-purple-50 rounded-xl flex items-center gap-3 border border-purple-100">
+                                <span class="w-8 h-8 rounded-lg bg-purple-500 text-white flex items-center justify-center font-bold text-xs">2</span>
+                                <span>Angkat & gerakkan <b>Tangan Kiri</b></span>
+                            </li>
+                            <li class="p-2.5 bg-amber-50 rounded-xl flex items-center gap-3 border border-amber-100">
+                                <span class="w-8 h-8 rounded-lg bg-amber-500 text-white flex items-center justify-center font-bold text-xs">3</span>
+                                <span>Gelengkan <b>Kepala ke Kiri & Kanan</b></span>
+                            </li>
+                            <li class="p-2.5 bg-emerald-50 rounded-xl flex items-center gap-3 border border-emerald-100">
+                                <span class="w-8 h-8 rounded-lg bg-emerald-500 text-white flex items-center justify-center font-bold text-xs">4</span>
+                                <span>Angkat/Gerakkan <b>Kaki Kanan / Kiri</b></span>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <div class="mt-4 p-3 bg-brandYellow/30 rounded-2xl border border-brandYellow text-xs text-slate-700 flex items-center gap-2">
+                        <i class="fa-solid fa-lightbulb text-brandOrange text-xl"></i>
+                        <span><b>Tips Guru:</b> Garis cyan akan menebal saat kamu bergerak aktif!</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ================= TAB 2: MATERI BELAJAR ================= -->
+        <section id="tab-materi" class="tab-content hidden grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            <!-- PENJELASAN UTAMA (Kiri) -->
+            <div class="lg:col-span-7 flex flex-col gap-4">
+                <div class="glass-card rounded-3xl p-6">
+                    <h2 class="heading-font text-2xl md:text-3xl text-brandPurple font-bold mb-2 flex items-center gap-2">
+                        <i class="fa-solid fa-child text-brandOrange"></i> Belajar Anggota Tubuh
+                    </h2>
+                    <p class="text-sm text-slate-600 mb-6">Klik pada kartu di bawah atau bagian tubuh untuk mendengarkan penjelasannya!</p>
+
+                    <!-- Card Bagian Tubuh -->
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+                        <!-- Kepala -->
+                        <div onclick="speakLesson('kepala')" class="cursor-pointer bg-amber-100 hover:bg-amber-200 border-2 border-amber-300 p-4 rounded-2xl flex flex-col items-center text-center transition transform hover:-translate-y-1 shadow-sm">
+                            <div class="w-16 h-16 bg-white rounded-full flex items-center justify-center text-3xl text-amber-500 shadow mb-3">
+                                <i class="fa-solid fa-face-smile"></i>
+                            </div>
+                            <h3 class="heading-font font-bold text-lg text-amber-900">Kepala</h3>
+                            <p class="text-xs text-amber-800 mt-1">Mata, Hidung, Mulut, Telinga, & Otak</p>
+                            <button class="mt-3 bg-amber-500 text-white px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
+                                <i class="fa-solid fa-volume-high"></i> Dengar
+                            </button>
+                        </div>
+
+                        <!-- Tangan -->
+                        <div onclick="speakLesson('tangan')" class="cursor-pointer bg-blue-100 hover:bg-blue-200 border-2 border-blue-300 p-4 rounded-2xl flex flex-col items-center text-center transition transform hover:-translate-y-1 shadow-sm">
+                            <div class="w-16 h-16 bg-white rounded-full flex items-center justify-center text-3xl text-blue-500 shadow mb-3">
+                                <i class="fa-solid fa-hand"></i>
+                            </div>
+                            <h3 class="heading-font font-bold text-lg text-blue-900">Tangan</h3>
+                            <p class="text-xs text-blue-800 mt-1">Lengan, Siku, & Jari-jari Tangan</p>
+                            <button class="mt-3 bg-blue-500 text-white px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
+                                <i class="fa-solid fa-volume-high"></i> Dengar
+                            </button>
+                        </div>
+
+                        <!-- Kaki -->
+                        <div onclick="speakLesson('kaki')" class="cursor-pointer bg-emerald-100 hover:bg-emerald-200 border-2 border-emerald-300 p-4 rounded-2xl flex flex-col items-center text-center transition transform hover:-translate-y-1 shadow-sm">
+                            <div class="w-16 h-16 bg-white rounded-full flex items-center justify-center text-3xl text-emerald-500 shadow mb-3">
+                                <i class="fa-solid fa-shoe-prints"></i>
+                            </div>
+                            <h3 class="heading-font font-bold text-lg text-emerald-900">Kaki</h3>
+                            <p class="text-xs text-emerald-800 mt-1">Paha, Lutut, & Jari-jari Kaki</p>
+                            <button class="mt-3 bg-emerald-500 text-white px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
+                                <i class="fa-solid fa-volume-high"></i> Dengar
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Panel Detail Materi Terpilih -->
+                    <div id="lesson-detail-box" class="bg-white p-5 rounded-2xl border-2 border-brandPurple/30 shadow-sm flex items-start gap-4">
+                        <div id="lesson-icon" class="text-4xl text-brandPurple p-3 bg-purple-50 rounded-2xl">
+                            <i class="fa-solid fa-graduation-cap"></i>
+                        </div>
+                        <div>
+                            <h4 id="lesson-title" class="heading-font text-xl font-bold text-brandPurple mb-1">Klik Salah Satu Anggota Tubuh</h4>
+                            <p id="lesson-desc" class="text-sm text-slate-600 leading-relaxed">
+                                Mari pelajari fungsi hebat dari tubuh kita! Klik tombol di atas untuk melihat dan mendengarkan penjelasannya.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- DIAGRAM TUBUH INTERAKTIF (Kanan) -->
+            <div class="lg:col-span-5 flex flex-col gap-4">
+                <div class="glass-card rounded-3xl p-6 flex flex-col items-center text-center">
+                    <h3 class="heading-font text-xl font-bold text-slate-800 mb-4">Diagram Tubuh Interaktif</h3>
+                    
+                    <!-- SVG Ilustrasi Tubuh Sederhana Anak -->
+                    <div class="relative w-64 h-80 bg-cyan-50 rounded-3xl border-2 border-cyan-200 flex items-center justify-center overflow-hidden p-4">
+                        <svg viewBox="0 0 200 300" class="w-full h-full drop-shadow">
+                            <!-- Kepala -->
+                            <g class="cursor-pointer hover:opacity-80 transition" onclick="speakLesson('kepala')">
+                                <circle cx="100" cy="55" r="35" fill="#FFD1A4" stroke="#FF914D" stroke-width="3"/>
+                                <!-- Mata -->
+                                <circle cx="88" cy="50" r="4" fill="#333"/>
+                                <circle cx="112" cy="50" r="4" fill="#333"/>
+                                <!-- Senyum -->
+                                <path d="M 88 65 Q 100 78 112 65" fill="none" stroke="#E53935" stroke-width="3" stroke-linecap="round"/>
+                                <!-- Telinga -->
+                                <circle cx="63" cy="55" r="6" fill="#FFD1A4"/>
+                                <circle cx="137" cy="55" r="6" fill="#FFD1A4"/>
+                            </g>
+                            
+                            <!-- Badan -->
+                            <rect x="75" y="95" width="50" height="90" rx="10" fill="#00C2CB" stroke="#00838F" stroke-width="3"/>
+
+                            <!-- Tangan Kiri -->
+                            <g class="cursor-pointer hover:opacity-80 transition" onclick="speakLesson('tangan')">
+                                <path d="M 75 105 L 40 160" stroke="#FFD1A4" stroke-width="14" stroke-linecap="round"/>
+                                <circle cx="38" cy="165" r="9" fill="#FFD1A4"/>
+                            </g>
+
+                            <!-- Tangan Kanan -->
+                            <g class="cursor-pointer hover:opacity-80 transition" onclick="speakLesson('tangan')">
+                                <path d="M 125 105 L 160 160" stroke="#FFD1A4" stroke-width="14" stroke-linecap="round"/>
+                                <circle cx="162" cy="165" r="9" fill="#FFD1A4"/>
+                            </g>
+
+                            <!-- Kaki Kiri -->
+                            <g class="cursor-pointer hover:opacity-80 transition" onclick="speakLesson('kaki')">
+                                <path d="M 88 185 L 85 260" stroke="#FFD1A4" stroke-width="16" stroke-linecap="round"/>
+                                <ellipse cx="80" cy="265" rx="12" ry="7" fill="#7ED957"/>
+                            </g>
+
+                            <!-- Kaki Kanan -->
+                            <g class="cursor-pointer hover:opacity-80 transition" onclick="speakLesson('kaki')">
+                                <path d="M 112 185 L 115 260" stroke="#FFD1A4" stroke-width="16" stroke-linecap="round"/>
+                                <ellipse cx="120" cy="265" rx="12" ry="7" fill="#7ED957"/>
+                            </g>
+                        </svg>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-3 font-semibold"><i class="fa-solid fa-hand-pointer text-brandOrange"></i> Sentuh bagian tubuh pada gambar di atas!</p>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ================= TAB 3: KUIS GERAK INTERAKTIF ================= -->
+        <section id="tab-kuis" class="tab-content hidden flex flex-col gap-6">
+            
+            <!-- HEADER KUIS & SKOR -->
+            <div class="glass-card rounded-3xl p-5 flex flex-wrap justify-between items-center gap-4 border-b-8 border-brandPink">
+                <div>
+                    <h2 class="heading-font text-2xl font-bold text-brandPurple flex items-center gap-2">
+                        <i class="fa-solid fa-gamepad text-brandPink"></i> Kuis Gerak Interaktif
+                    </h2>
+                    <p class="text-xs text-slate-600">Jawab soal dengan mengangkat tanganmu di depan kamera!</p>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div class="bg-amber-100 text-amber-800 px-4 py-2 rounded-2xl font-bold heading-font text-lg flex items-center gap-2 border border-amber-300">
+                        <i class="fa-solid fa-star text-amber-500 text-xl"></i>
+                        <span>Skor: <span id="quiz-score" class="text-2xl text-amber-600">0</span></span>
+                    </div>
+                    <button onclick="restartQuiz()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2 rounded-2xl font-bold heading-font text-sm">
+                        <i class="fa-solid fa-rotate-left"></i> Ulangi
+                    </button>
+                </div>
+            </div>
+
+            <!-- AREA UTAMA KUIS (Split Screen Webcam & Pilihan Jawaban) -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                
+                <!-- WEBCAM & DETEKSI HOLD PROGRESS (Kiri) -->
+                <div class="lg:col-span-7 flex flex-col gap-4">
+                    <div class="glass-card rounded-3xl p-4 flex flex-col items-center relative">
+                        <div class="w-full flex justify-between items-center mb-2">
+                            <span class="heading-font text-sm text-slate-600 font-bold">Kamera Kuis</span>
+                            <span id="quiz-hold-status" class="text-xs font-bold text-brandPurple bg-purple-100 px-3 py-1 rounded-full">
+                                Angkat Tangan untuk Memilih!
+                            </span>
+                        </div>
+
+                        <!-- Video Container Kuis -->
+                        <div class="relative w-full aspect-video bg-slate-900 rounded-2xl overflow-hidden shadow-inner border-4 border-pink-200">
+                            <div class="mirror-container absolute inset-0 w-full h-full">
+                                <canvas id="quiz-canvas" class="w-full h-full object-cover"></canvas>
+                            </div>
+
+                            <!-- OVERLAY PETUNJUK ANGKAT TANGAN -->
+                            <div class="absolute inset-x-0 top-3 flex justify-between px-4 pointer-events-none">
+                                <div id="badge-option-a" class="bg-brandPink/90 text-white font-bold px-4 py-2 rounded-2xl shadow-lg border-2 border-white heading-font text-sm flex items-center gap-2 transition transform">
+                                    <i class="fa-solid fa-hand-back-fist"></i> PILIHAN A (Tangan Kiri)
+                                </div>
+                                <div id="badge-option-b" class="bg-brandBlue/90 text-white font-bold px-4 py-2 rounded-2xl shadow-lg border-2 border-white heading-font text-sm flex items-center gap-2 transition transform">
+                                    PILIHAN B (Tangan Kanan) <i class="fa-solid fa-hand-back-fist"></i>
+                                </div>
+                            </div>
+
+                            <!-- RING PROGRESS HOLD DETEKSI -->
+                            <div id="hold-progress-container" class="absolute inset-0 flex flex-col items-center justify-center bg-black/40 pointer-events-none opacity-0 transition-opacity">
+                                <div class="relative flex items-center justify-center">
+                                    <svg class="w-28 h-28 transform -rotate-90">
+                                        <circle cx="56" cy="56" r="48" stroke="rgba(255,255,255,0.3)" stroke-width="8" fill="none"/>
+                                        <circle id="hold-progress-circle" cx="56" cy="56" r="48" stroke="#FFDE59" stroke-width="8" fill="none" stroke-dasharray="301.59" stroke-dashoffset="301.59" stroke-linecap="round"/>
+                                    </svg>
+                                    <span id="hold-target-text" class="absolute heading-font text-2xl font-bold text-white drop-shadow">A</span>
+                                </div>
+                                <p class="text-white font-bold heading-font mt-2 text-sm drop-shadow">Tahan posisi tanganmu!</p>
+                            </div>
+
+                            <!-- Warning Kamera Mati di Kuis -->
+                            <div id="quiz-camera-off-msg" class="absolute inset-0 bg-slate-900/90 text-white flex flex-col items-center justify-center p-4 text-center z-20">
+                                <p class="heading-font text-lg mb-3">Kamera belum dibuka di Detektor Gerak!</p>
+                                <button onclick="switchTab('detektor'); startCamera();" class="bg-brandGreen text-white font-bold px-6 py-2 rounded-xl heading-font">
+                                    Buka Kamera Sekarang
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SOAL DAN OPTIONS (Kanan) -->
+                <div class="lg:col-span-5 flex flex-col gap-4">
+                    <div class="glass-card rounded-3xl p-6 flex-1 flex flex-col justify-between border-2 border-brandBlue/30">
+                        <div>
+                            <!-- Indicator Soal Ke- -->
+                            <div class="flex justify-between items-center mb-4">
+                                <span class="bg-brandPurple text-white px-3 py-1 rounded-full text-xs font-bold heading-font">
+                                    Soal <span id="current-question-num">1</span> dari <span id="total-questions-num">3</span>
+                                </span>
+                                <button onclick="repeatQuestionAudio()" class="text-brandPurple bg-purple-100 hover:bg-purple-200 p-2 rounded-xl text-sm font-bold flex items-center gap-1 transition">
+                                    <i class="fa-solid fa-volume-high"></i> Baca Soal
+                                </button>
+                            </div>
+
+                            <!-- Teks Soal -->
+                            <h3 id="question-text" class="heading-font text-xl md:text-2xl font-bold text-slate-800 mb-6 leading-snug">
+                                Memuat Soal...
+                            </h3>
+
+                            <!-- Pilihan Jawaban A dan B -->
+                            <div class="space-y-4">
+                                <!-- Option A -->
+                                <div id="card-option-a" class="border-4 border-brandPink bg-pink-50 p-4 rounded-2xl transition transform flex items-center gap-4">
+                                    <div class="w-12 h-12 rounded-xl bg-brandPink text-white font-bold heading-font text-2xl flex items-center justify-center shadow">
+                                        A
+                                    </div>
+                                    <div class="flex-1">
+                                        <p class="text-xs text-brandPink font-bold uppercase">Angkat Tangan Kiri</p>
+                                        <p id="text-option-a" class="heading-font text-lg font-bold text-slate-800">Pilihan A</p>
+                                    </div>
+                                </div>
+
+                                <!-- Option B -->
+                                <div id="card-option-b" class="border-4 border-brandBlue bg-cyan-50 p-4 rounded-2xl transition transform flex items-center gap-4">
+                                    <div class="w-12 h-12 rounded-xl bg-brandBlue text-white font-bold heading-font text-2xl flex items-center justify-center shadow">
+                                        B
+                                    </div>
+                                    <div class="flex-1">
+                                        <p class="text-xs text-brandBlue font-bold uppercase">Angkat Tangan Kanan</p>
+                                        <p id="text-option-b" class="heading-font text-lg font-bold text-slate-800">Pilihan B</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mt-6 p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-800 flex items-center gap-2">
+                            <i class="fa-solid fa-hand-point-up text-amber-500 text-lg"></i>
+                            <span><b>Cara Menjawab:</b> Angkat tanganmu lebih tinggi dari bahu selama 1 detik!</span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+    </main>
+
+
+    <!-- MODAL SELESAI KUIS -->
+    <div id="quiz-result-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="glass-card rounded-3xl p-8 max-w-md w-full text-center border-4 border-brandYellow shadow-2xl transform transition-all scale-95">
+            <div class="w-24 h-24 bg-brandYellow/30 text-brandOrange rounded-full flex items-center justify-center mx-auto text-5xl mb-4 animate-bounce">
+                <i class="fa-solid fa-trophy"></i>
+            </div>
+            <h2 class="heading-font text-3xl font-bold text-brandPurple mb-2">Hore! Kamu Hebat!</h2>
+            <p class="text-slate-600 text-sm mb-4">Kamu telah menyelesaikan Kuis Gerak Anggota Tubuh!</p>
+            
+            <div class="bg-amber-50 border-2 border-amber-200 rounded-2xl p-4 mb-6">
+                <p class="text-xs text-amber-700 font-bold uppercase">Skor Akhir Kamu:</p>
+                <p id="final-score-text" class="heading-font text-5xl font-bold text-amber-600 my-1">100</p>
+                <p id="final-eval-text" class="text-xs font-semibold text-slate-600">Luar biasa! Semua jawabanmu benar!</p>
+            </div>
+
+            <button onclick="closeResultModal(); restartQuiz();" class="w-full bg-brandGreen hover:bg-emerald-600 text-white font-bold heading-font text-lg py-3 rounded-2xl shadow-lg transition transform hover:scale-105">
+                <i class="fa-solid fa-rotate-right mr-1"></i> Main Lagi Yuk!
+            </button>
+        </div>
+    </div>
+
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        /* ================= STATE GLOBAL & VARIABEL ================= */
+        let isAudioMuted = false;
+        let activeTab = 'detektor';
+        
+        // Webcam & MediaPipe
+        let videoElement = document.getElementById('webcam');
+        let canvasElement = document.getElementById('output-canvas');
+        let canvasCtx = canvasElement.getContext('2d');
+        let quizCanvasElement = document.getElementById('quiz-canvas');
+        let quizCanvasCtx = quizCanvasElement.getContext('2d');
+        
+        let camera = null;
+        let pose = null;
+        let isCameraActive = false;
+
+        // Motion Detection Velocity Calculations
+        let prevLandmarks = null;
+        let lastMotionSpeechTime = 0;
+        const MOTION_SPEECH_DEBOUNCE = 3500; // Delay 3.5 detik antar ucapan otomatis
+
+        // Quiz Logic Data
+        const quizQuestions = [
+            {
+                question: "Manakah anggota tubuh yang kita gunakan untuk MENDENGAR suara musik?",
+                optionA: "Kepala (Telinga)",
+                optionB: "Kaki",
+                correctOption: "A"
+            },
+            {
+                question: "Kita menggunakan anggota tubuh ini untuk BERJALAN dan LARI. Apakah itu?",
+                optionA: "Tangan",
+                optionB: "Kaki",
+                correctOption: "B"
+            },
+            {
+                question: "Saat kita ingin MEMEGANG pensil untuk menggambar, kita menggunakan...",
+                optionA: "Jari Tangan",
+                optionB: "Kepala",
+                correctOption: "A"
+            }
+        ];
+
+        let currentQuestionIndex = 0;
+        let quizScore = 0;
+        let holdOption = null; // 'A' or 'B'
+        let holdStartTime = null;
+        const HOLD_DURATION = 1000; // 1 detik hold
+        let isQuizAnsweredLock = false;
+
+        /* ================= AUDIO SYNTHESIZER (Web Audio API) ================= */
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playSoundEffect(type) {
+            if (isAudioMuted) return;
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            const now = audioCtx.currentTime;
+
+            if (type === 'success') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(523.25, now);
+                osc.frequency.exponentialRampToValueAtTime(659.25, now + 0.1);
+                osc.frequency.exponentialRampToValueAtTime(783.99, now + 0.2);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+                osc.start(now);
+                osc.stop(now + 0.4);
+            } else if (type === 'progress') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(300, now);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+                osc.start(now);
+                osc.stop(now + 0.08);
+            } else if (type === 'fanfare') {
+                [261.63, 329.63, 392.00, 523.25].forEach((freq, idx) => {
+                    const osc2 = audioCtx.createOscillator();
+                    const gain2 = audioCtx.createGain();
+                    osc2.connect(gain2);
+                    gain2.connect(audioCtx.destination);
+                    osc2.type = 'sine';
+                    osc2.frequency.setValueAtTime(freq, now + idx * 0.1);
+                    gain2.gain.setValueAtTime(0.2, now + idx * 0.1);
+                    gain2.gain.exponentialRampToValueAtTime(0.01, now + idx * 0.1 + 0.3);
+                    osc2.start(now + idx * 0.1);
+                    osc2.stop(now + idx * 0.1 + 0.3);
+                });
+            }
+        }
+
+        /* ================= TEXT TO SPEECH (Indonesian) ================= */
+        function speakText(text, onEndCallback = null) {
+            if (isAudioMuted) {
+                if(onEndCallback) onEndCallback();
+                return;
+            }
+
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'id-ID';
+                utterance.rate = 0.9;
+                utterance.pitch = 1.1;
+
+                if (onEndCallback) {
+                    utterance.onend = onEndCallback;
+                }
+
+                window.speechSynthesis.speak(utterance);
+            } else {
+                if(onEndCallback) onEndCallback();
+            }
+        }
+
+        function toggleAudio() {
+            isAudioMuted = !isAudioMuted;
+            const icon = document.getElementById('sound-icon');
+            if (isAudioMuted) {
+                icon.className = 'fa-solid fa-volume-xmark text-red-300';
+                window.speechSynthesis.cancel();
+            } else {
+                icon.className = 'fa-solid fa-volume-high';
+                speakText("Suara diaktifkan!");
+            }
+        }
+
+        /* ================= TAB SWITCHING ================= */
+        function switchTab(tabName) {
+            activeTab = tabName;
+            
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('bg-white', 'text-brandPurple', 'shadow');
+                btn.classList.add('text-white', 'hover:bg-white/10');
+            });
+
+            document.getElementById(`tab-${tabName}`).classList.remove('hidden');
+            const activeBtn = document.getElementById(`tab-${tabName}-btn`);
+            activeBtn.classList.add('bg-white', 'text-brandPurple', 'shadow');
+            activeBtn.classList.remove('text-white', 'hover:bg-white/10');
+
+            const quizCamMsg = document.getElementById('quiz-camera-off-msg');
+            if(quizCamMsg) {
+                if (isCameraActive) quizCamMsg.classList.add('hidden');
+                else quizCamMsg.classList.remove('hidden');
+            }
+
+            if (tabName === 'kuis') {
+                loadQuizQuestion();
+            } else {
+                window.speechSynthesis.cancel();
+            }
+        }
+
+        /* ================= MEDIAPIPE POSE SETUP ================= */
+        function initMediaPipe() {
+            pose = new Pose({
+                locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
+            });
+
+            pose.setOptions({
+                modelComplexity: 1,
+                smoothLandmarks: true,
+                enableSegmentation: false,
+                minDetectionConfidence: 0.5,
+                minTrackingConfidence: 0.5
+            });
+
+            pose.onResults(onPoseResults);
+        }
+
+        function startCamera() {
+            if (isCameraActive) return;
+
+            document.getElementById('camera-placeholder').classList.add('hidden');
+            
+            camera = new Camera(videoElement, {
+                onFrame: async () => {
+                    await pose.send({ image: videoElement });
+                },
+                width: 640,
+                height: 360
+            });
+
+            camera.start().then(() => {
+                isCameraActive = true;
+                updateCameraBadge(true);
+                document.getElementById('quiz-camera-off-msg').classList.add('hidden');
+                speakText("Kamera berhasil dibuka!");
+            }).catch(err => {
+                console.error("Gagal membuka kamera:", err);
+                alert("Gagal mengakses kamera. Pastikan izin kamera telah diberikan pada browser.");
+            });
+        }
+
+        function toggleCamera() {
+            if (isCameraActive) {
+                if (camera) camera.stop();
+                isCameraActive = false;
+                updateCameraBadge(false);
+                document.getElementById('camera-placeholder').classList.remove('hidden');
+                document.getElementById('quiz-camera-off-msg').classList.remove('hidden');
+            } else {
+                startCamera();
+            }
+        }
+
+        function updateCameraBadge(active) {
+            const badge = document.getElementById('camera-status-badge');
+            const textBtn = document.getElementById('toggle-cam-text');
+            if (active) {
+                badge.className = "px-3 py-1 bg-emerald-100 text-emerald-700 font-bold rounded-full text-xs flex items-center gap-2";
+                badge.innerHTML = `<span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span> Kamera Aktif`;
+                textBtn.innerText = "Tutup Kamera";
+            } else {
+                badge.className = "px-3 py-1 bg-red-100 text-red-600 font-bold rounded-full text-xs flex items-center gap-2";
+                badge.innerHTML = `<span class="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"></span> Kamera Mati`;
+                textBtn.innerText = "Buka Kamera";
+            }
+        }
+
+        function resetDetection() {
+            prevLandmarks = null;
+            document.getElementById('motion-status').innerHTML = `
+                <i class="fa-solid fa-wand-magic-sparkles text-brandYellow text-3xl"></i>
+                <span>Diam / Bersiap</span>
+            `;
+            speakText("Deteksi direset!");
+        }
+
+        /* ================= RENDERING RANGKA & DETEKSI GERAK ================= */
+        function onPoseResults(results) {
+            if (!results.poseLandmarks) return;
+
+            const landmarks = results.poseLandmarks;
+
+            let overallVelocity = 0;
+            let rightArmVel = 0, leftArmVel = 0;
+            let rightLegVel = 0, leftLegVel = 0;
+            let headVel = 0;
+
+            if (prevLandmarks) {
+                const getDist = (idx) => {
+                    const dx = landmarks[idx].x - prevLandmarks[idx].x;
+                    const dy = landmarks[idx].y - prevLandmarks[idx].y;
+                    return Math.sqrt(dx * dx + dy * dy);
+                };
+
+                headVel = (getDist(0) + getDist(2) + getDist(5)) / 3;
+                rightArmVel = (getDist(14) + getDist(16)) / 2;
+                leftArmVel = (getDist(13) + getDist(15)) / 2;
+                rightLegVel = (getDist(26) + getDist(28)) / 2;
+                leftLegVel = (getDist(25) + getDist(27)) / 2;
+
+                overallVelocity = (headVel + rightArmVel + leftArmVel + rightLegVel + leftLegVel) / 5;
+            }
+
+            prevLandmarks = landmarks;
+
+            if (activeTab === 'detektor') {
+                drawSkeleton(canvasCtx, canvasElement, landmarks, overallVelocity);
+                evaluateMotionStatus(landmarks, headVel, rightArmVel, leftArmVel, rightLegVel, leftLegVel);
+            }
+
+            if (activeTab === 'kuis') {
+                drawSkeleton(quizCanvasCtx, quizCanvasElement, landmarks, overallVelocity);
+                handleQuizMotionLogic(landmarks);
+            }
+        }
+
+        function drawSkeleton(ctx, canvas, landmarks, velocity) {
+            ctx.save();
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+
+            const baseLineWidth = Math.min(Math.max(3 + velocity * 250, 3), 14);
+
+            const connections = [
+                [11, 12], [11, 13], [13, 15], [12, 14], [14, 16],
+                [11, 23], [12, 24], [23, 24], [23, 25], [25, 27],
+                [24, 26], [26, 28], [0, 11], [0, 12]
+            ];
+
+            ctx.strokeStyle = velocity > 0.02 ? '#00FFFF' : '#00C2CB';
+            ctx.lineWidth = baseLineWidth;
+            ctx.lineCap = 'round';
+
+            connections.forEach(([i, j]) => {
+                const p1 = landmarks[i];
+                const p2 = landmarks[j];
+                if (p1 && p2 && p1.visibility > 0.4 && p2.visibility > 0.4) {
+                    ctx.beginPath();
+                    ctx.moveTo(p1.x * canvas.width, p1.y * canvas.height);
+                    ctx.lineTo(p2.x * canvas.width, p2.y * canvas.height);
+                    ctx.stroke();
+                }
+            });
+
+            landmarks.forEach((lm, index) => {
+                if (lm.visibility > 0.4 && [0, 11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28].includes(index)) {
+                    ctx.beginPath();
+                    ctx.arc(lm.x * canvas.width, lm.y * canvas.height, baseLineWidth * 0.8 + 4, 0, 2 * Math.PI);
+                    ctx.fillStyle = '#FFDE59';
+                    ctx.fill();
+                    ctx.strokeStyle = '#FF914D';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                }
+            });
+
+            ctx.restore();
+        }
+
+        /* ================= EVALUASI STATUS GERAKAN TUBUH ================= */
+        function evaluateMotionStatus(landmarks, headVel, rightArmVel, leftArmVel, rightLegVel, leftLegVel) {
+            const VEL_THRESHOLD = 0.025;
+            let detectedStatus = "Diam / Bersiap";
+            let iconClass = "fa-wand-magic-sparkles text-brandYellow";
+
+            if (rightArmVel > VEL_THRESHOLD) {
+                detectedStatus = "Tangan Kanan Bergerak";
+                iconClass = "fa-hand text-brandBlue animate-bounce";
+            } else if (leftArmVel > VEL_THRESHOLD) {
+                detectedStatus = "Tangan Kiri Bergerak";
+                iconClass = "fa-hand text-brandPink animate-bounce";
+            } else if (rightLegVel > VEL_THRESHOLD) {
+                detectedStatus = "Kaki Kanan Bergerak";
+                iconClass = "fa-shoe-prints text-brandGreen animate-bounce";
+            } else if (leftLegVel > VEL_THRESHOLD) {
+                detectedStatus = "Kaki Kiri Bergerak";
+                iconClass = "fa-shoe-prints text-brandOrange animate-bounce";
+            } else if (headVel > VEL_THRESHOLD) {
+                const noseX = landmarks[0].x;
+                if (noseX < 0.45) {
+                    detectedStatus = "Kepala Bergerak ke Kanan";
+                } else if (noseX > 0.55) {
+                    detectedStatus = "Kepala Bergerak ke Kiri";
+                } else {
+                    detectedStatus = "Kepala Bergerak";
+                }
+                iconClass = "fa-face-smile text-brandYellow animate-spin";
+            }
+
+            const statusBox = document.getElementById('motion-status');
+            statusBox.innerHTML = `<i class="fa-solid ${iconClass} text-3xl"></i> <span>${detectedStatus}</span>`;
+
+            const now = Date.now();
+            if (detectedStatus !== "Diam / Bersiap" && (now - lastMotionSpeechTime > MOTION_SPEECH_DEBOUNCE)) {
+                speakText(detectedStatus);
+                lastMotionSpeechTime = now;
+            }
+        }
+
+        /* ================= MATERI BELAJAR SPEECH ================= */
+        function speakLesson(part) {
+            const detailBox = document.getElementById('lesson-detail-box');
+            const icon = document.getElementById('lesson-icon');
+            const title = document.getElementById('lesson-title');
+            const desc = document.getElementById('lesson-desc');
+
+            let titleText = "", descText = "", speechText = "";
+
+            if (part === 'kepala') {
+                icon.innerHTML = `<i class="fa-solid fa-face-smile text-amber-500"></i>`;
+                titleText = "Kepala Utamaku";
+                descText = "Di kepala ada mata untuk melihat benda indah, hidung untuk mencium bau harum, mulut untuk makan & berbicara, serta telinga untuk mendengar!";
+                speechText = "Ini Kepala! Di kepala ada mata untuk melihat, hidung untuk bernapas, mulut untuk makan, dan telinga untuk mendengar.";
+            } else if (part === 'tangan') {
+                icon.innerHTML = `<i class="fa-solid fa-hand text-blue-500"></i>`;
+                titleText = "Tangan yang Tangkas";
+                descText = "Kita punya dua tangan! Tangan digunakan untuk memegang mainan, menulis, menggambar, dan bersalaman dengan teman.";
+                speechText = "Ini Tangan! Tangan kita gunakan untuk memegang benda, menulis, dan bersalaman.";
+            } else if (part === 'kaki') {
+                icon.innerHTML = `<i class="fa-solid fa-shoe-prints text-emerald-500"></i>`;
+                titleText = "Kaki yang Kuat";
+                descText = "Kaki membuat tubuh kita bisa berdiri tegak, berlari cepat, melompat tinggi, dan menendang bola saat bermain!";
+                speechText = "Ini Kaki! Kaki membuat kita bisa berjalan, berlari, dan melompat tinggi.";
+            }
+
+            title.innerText = titleText;
+            desc.innerText = descText;
+
+            detailBox.classList.add('ring-4', 'ring-brandYellow');
+            setTimeout(() => detailBox.classList.remove('ring-4', 'ring-brandYellow'), 1000);
+
+            speakText(speechText);
+        }
+
+        /* ================= LOGIKA KUIS GERAK (ANGKAT TANGAN) ================= */
+        function loadQuizQuestion() {
+            if (currentQuestionIndex >= quizQuestions.length) {
+                showQuizResult();
+                return;
+            }
+
+            isQuizAnsweredLock = false;
+            resetHoldProgress();
+
+            const q = quizQuestions[currentQuestionIndex];
+            document.getElementById('current-question-num').innerText = currentQuestionIndex + 1;
+            document.getElementById('total-questions-num').innerText = quizQuestions.length;
+            document.getElementById('question-text').innerText = q.question;
+            document.getElementById('text-option-a').innerText = q.optionA;
+            document.getElementById('text-option-b').innerText = q.optionB;
+
+            document.getElementById('card-option-a').className = "border-4 border-brandPink bg-pink-50 p-4 rounded-2xl transition transform flex items-center gap-4";
+            document.getElementById('card-option-b').className = "border-4 border-brandBlue bg-cyan-50 p-4 rounded-2xl transition transform flex items-center gap-4";
+
+            speakText(`Soal nomor ${currentQuestionIndex + 1}. ${q.question}. Angkat tangan kiri untuk ${q.optionA}, atau angkat tangan kanan untuk ${q.optionB}.`);
+        }
+
+        function repeatQuestionAudio() {
+            const q = quizQuestions[currentQuestionIndex];
+            speakText(`${q.question}. Pilihan A: ${q.optionA}. Pilihan B: ${q.optionB}.`);
+        }
+
+        function handleQuizMotionLogic(landmarks) {
+            if (isQuizAnsweredLock) return;
+
+            const leftWrist = landmarks[15];
+            const leftShoulder = landmarks[11];
+            const rightWrist = landmarks[16];
+            const rightShoulder = landmarks[12];
+
+            const isLeftHandRaised = leftWrist && leftShoulder && (leftWrist.y < leftShoulder.y - 0.05);
+            const isRightHandRaised = rightWrist && rightShoulder && (rightWrist.y < rightShoulder.y - 0.05);
+
+            let detectedChoice = null;
+
+            if (isLeftHandRaised && !isRightHandRaised) {
+                detectedChoice = 'A';
+            } else if (isRightHandRaised && !isLeftHandRaised) {
+                detectedChoice = 'B';
+            }
+
+            if (detectedChoice) {
+                if (holdOption !== detectedChoice) {
+                    holdOption = detectedChoice;
+                    holdStartTime = Date.now();
+                    showHoldProgressUI(true, detectedChoice);
+                } else {
+                    const elapsedTime = Date.now() - holdStartTime;
+                    const progressRatio = Math.min(elapsedTime / HOLD_DURATION, 1.0);
+                    
+                    updateHoldProgressUI(progressRatio, detectedChoice);
+                    playSoundEffect('progress');
+
+                    if (progressRatio >= 1.0) {
+                        isQuizAnsweredLock = true;
+                        validateQuizAnswer(detectedChoice);
+                    }
+                }
+            } else {
+                resetHoldProgress();
+            }
+        }
+
+        function showHoldProgressUI(show, choice) {
+            const container = document.getElementById('hold-progress-container');
+            const targetText = document.getElementById('hold-target-text');
+            if (show) {
+                container.classList.remove('opacity-0');
+                targetText.innerText = choice;
+                
+                if(choice === 'A') {
+                    document.getElementById('card-option-a').classList.add('scale-105', 'ring-4', 'ring-brandPink');
+                } else {
+                    document.getElementById('card-option-b').classList.add('scale-105', 'ring-4', 'ring-brandBlue');
+                }
+            } else {
+                container.classList.add('opacity-0');
+            }
+        }
+
+        function updateHoldProgressUI(ratio, choice) {
+            const circle = document.getElementById('hold-progress-circle');
+            const circumference = 2 * Math.PI * 48;
+            const offset = circumference - (ratio * circumference);
+            circle.style.strokeDashoffset = offset;
+        }
+
+        function resetHoldProgress() {
+            holdOption = null;
+            holdStartTime = null;
+            showHoldProgressUI(false, '');
+            document.getElementById('card-option-a').classList.remove('scale-105', 'ring-4', 'ring-brandPink');
+            document.getElementById('card-option-b').classList.remove('scale-105', 'ring-4', 'ring-brandBlue');
+        }
+
+        function validateQuizAnswer(selectedOption) {
+            resetHoldProgress();
+            const q = quizQuestions[currentQuestionIndex];
+            const isCorrect = (selectedOption === q.correctOption);
+
+            if (isCorrect) {
+                quizScore += 100 / quizQuestions.length;
+                document.getElementById('quiz-score').innerText = Math.round(quizScore);
+                playSoundEffect('success');
+                
+                const correctCard = document.getElementById(`card-option-${selectedOption.toLowerCase()}`);
+                correctCard.className = "border-4 border-emerald-500 bg-emerald-100 p-4 rounded-2xl transition transform scale-105 flex items-center gap-4";
+
+                speakText("Hebat! Jawabanmu Benar!", () => {
+                    setTimeout(() => {
+                        currentQuestionIndex++;
+                        loadQuizQuestion();
+                    }, 1000);
+                });
+            } else {
+                const wrongCard = document.getElementById(`card-option-${selectedOption.toLowerCase()}`);
+                wrongCard.className = "border-4 border-red-500 bg-red-100 p-4 rounded-2xl transition transform flex items-center gap-4";
+
+                speakText("Hampir benar! Ayo coba lagi ya!", () => {
+                    setTimeout(() => {
+                        isQuizAnsweredLock = false;
+                        wrongCard.className = selectedOption === 'A' ? 
+                            "border-4 border-brandPink bg-pink-50 p-4 rounded-2xl transition transform flex items-center gap-4" :
+                            "border-4 border-brandBlue bg-cyan-50 p-4 rounded-2xl transition transform flex items-center gap-4";
+                    }, 1500);
+                });
+            }
+        }
+
+        function showQuizResult() {
+            playSoundEffect('fanfare');
+            
+            if (typeof confetti === 'function') {
+                confetti({
+                    particleCount: 100,
+                    spread: 70,
+                    origin: { y: 0.6 }
+                });
+            }
+
+            const modal = document.getElementById('quiz-result-modal');
+            const scoreText = document.getElementById('final-score-text');
+            const evalText = document.getElementById('final-eval-text');
+
+            const finalScore = Math.round(quizScore);
+            scoreText.innerText = finalScore;
+
+            if (finalScore >= 80) {
+                evalText.innerText = "Luar biasa! Kamu sudah sangat paham anggota tubuh!";
+            } else {
+                evalText.innerText = "Bagus sekali! Belajar lagi bersama guru agar makin pintar ya!";
+            }
+
+            modal.classList.remove('hidden');
+            speakText(`Hore! Kuis selesai. Skor akhir kamu adalah ${finalScore}. Kamu luar biasa!`);
+        }
+
+        function closeResultModal() {
+            document.getElementById('quiz-result-modal').classList.add('hidden');
+        }
+
+        function restartQuiz() {
+            currentQuestionIndex = 0;
+            quizScore = 0;
+            document.getElementById('quiz-score').innerText = "0";
+            closeResultModal();
+            loadQuizQuestion();
+        }
+
+        /* ================= INITIALIZATION ON LOAD ================= */
+        window.onload = function() {
+            const fitCanvasSize = () => {
+                [canvasElement, quizCanvasElement].forEach(canvas => {
+                    canvas.width = 640;
+                    canvas.height = 360;
+                });
+            };
+            fitCanvasSize();
+            window.addEventListener('resize', fitCanvasSize);
+
+            initMediaPipe();
+        };
+    </script>
+</body>
+</html>
